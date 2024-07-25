@@ -8,6 +8,8 @@ class Camera:
         self.y = y
         self.objects = objects
         self.turtle = turtle
+        self.execution_ids = []
+        self.current_id = 0
 
     def add(self, command, *args, **kwargs):
         sig = inspect.signature(command)
@@ -18,13 +20,18 @@ class Camera:
         self.objects.append((command, new_args, (original_x, original_y)))
 
     def draw(self, x, y, scale=1):
+        self.current_id += 1
+        self.execution_ids.append(self.current_id)
         self.turtle.reset()
         self.turtle.hideturtle()
         self.turtle.clear()
         self.turtle.penup()
         self.turtle.goto((-x) * scale, (-y) * scale)
         self.turtle.showturtle()
+
         for command, (args, kwargs), (original_x, original_y) in self.objects:
+            if self.execution_ids and self.execution_ids[-1] != self.current_id:
+                continue
             new_args = list(args)
             new_kwargs = dict(kwargs)
             sig = inspect.signature(command)
@@ -55,6 +62,8 @@ class Camera:
                         new_args[index] = (original_y - y) * scale
 
             command(*new_args, **new_kwargs)
+
+        self.execution_ids.remove(self.current_id)
 
 # Set up the screen
 screen = turtle.Screen()
@@ -108,8 +117,6 @@ c.add(pen.forward, 50)
 c.add(pen.back,50)
 c.add(pen.circle, 30)
 c.draw(x, y, scale)
-
-
 
 # Set up the mouse event handler
 mouse_handler = MouseEventHandler(c, screen)
