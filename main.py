@@ -2,11 +2,12 @@ import turtle
 import inspect
 from tkinter import *
 
-# Declare global variables
-global_x, global_y = 0, 0
+
+
+
 
 class Camera:
-    def __init__(self, x, y, objects, turtle):
+    def __init__(self, x, y, objects, turtle, scale=1):
         self.x = x
         self.y = y
         self.objects = objects
@@ -20,12 +21,12 @@ class Camera:
         new_args = (args, kwargs)
         self.objects.append((command, new_args, (original_x, original_y)))
 
-    def draw(self, x, y):
+    def draw(self, x, y,scale=1):
         self.turtle.reset()
         self.turtle.hideturtle()
         self.turtle.clear()
         self.turtle.penup()
-        self.turtle.teleport(-x,-y)
+        self.turtle.teleport((-x) * scale,(-y) * scale)
         self.turtle.showturtle()
         for command, (args, kwargs), (original_x, original_y) in self.objects:
             new_args = list(args)
@@ -35,22 +36,32 @@ class Camera:
 
             if 'x' in params and original_x is not None:
                 if 'x' in new_kwargs:
-                    new_kwargs['x'] = original_x - x
+                    new_kwargs['x'] = (original_x - x) * scale
                 else:
                     index = list(params.keys()).index('x')
                     if index < len(new_args):
-                        new_args[index] = original_x - x
+                        new_args[index] = (original_x - x) * scale
 
             if 'y' in params and original_y is not None:
                 if 'y' in new_kwargs:
-                    new_kwargs['y'] = original_y - y
+                    new_kwargs['y'] = (original_y - y) * scale
                 else:
                     index = list(params.keys()).index('y')
                     if index < len(new_args):
-                        new_args[index] = original_y - y
+                        new_args[index] = (original_y - y) * scale
 
             command(*new_args, **new_kwargs)
 
+
+# Set up the screen
+screen = turtle.Screen()
+screen.title("Testing")
+pen = turtle.Turtle()
+pen.speed(0)
+x, y = 0, 0
+scale = 3
+objects = []
+redraw = 0
 
 class MouseEventHandler:
     def __init__(self, canvas, screen):
@@ -62,24 +73,28 @@ class MouseEventHandler:
         self.mouse_down_pos = (x, y)
 
     def on_mouse_up(self, event):
-        global global_x, global_y
+        global x, y
         mouse_up_pos = (event.x - self.screen.window_width() // 2, 
                         -(event.y - self.screen.window_height() // 2))
         if self.mouse_down_pos:
-            x_diff = mouse_up_pos[0] - self.mouse_down_pos[0]
-            y_diff = mouse_up_pos[1] - self.mouse_down_pos[1]
-            global_x -= x_diff
-            global_y -= y_diff
-            self.canvas.draw(global_x, global_y)
+            x_diff = (mouse_up_pos[0] - self.mouse_down_pos[0]) / scale
+            y_diff = (mouse_up_pos[1] - self.mouse_down_pos[1]) / scale
+            x -= x_diff
+            y -= y_diff
+            self.canvas.draw(x, y, scale)
+    def on_scroll(self, event):
+        global scale, redraw
+        
+        self.min_redraw = 5
+        redraw += abs(event.delta)
+        scale -= (event.delta / 5)
+        scale = max(0.1, scale)
+        if self.min_redraw < redraw:
+            redraw = 0
+            c.draw(x, y, scale)
 
 
-# Set up the screen
-screen = turtle.Screen()
-screen.title("Testing")
-pen = turtle.Turtle()
-pen.speed(0)
-x, y = 0, 0
-objects = []
+
 
 c = Camera(x, y, objects, pen)
 c.add(pen.speed, 0)
@@ -88,14 +103,15 @@ c.add(pen.goto, 20, 20)
 c.add(pen.goto, 0, 40)
 c.add(pen.goto, -20, 20)
 c.add(pen.goto, 0, 0)
-c.draw(x, y)
+c.draw(x, y, scale)
 
 # Set up the mouse event handler
 mouse_handler = MouseEventHandler(c, screen)
 screen.onscreenclick(mouse_handler.on_mouse_down, 1)
 canvas = screen.getcanvas()
 canvas.bind("<ButtonRelease-1>", mouse_handler.on_mouse_up)
-#canvas.bind_all("<MouseWheel>", on_scroll)
+
+canvas.bind_all("<MouseWheel>", mouse_handler.on_scroll)
 
 
 # Keep the window open and responsive
