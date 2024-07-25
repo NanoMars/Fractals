@@ -10,6 +10,8 @@ class Camera:
         self.turtle = turtle
         self.execution_ids = []
         self.current_id = 0
+        self.scale = scale
+        self.redraw = 0
 
     def add(self, command, *args, **kwargs):
         sig = inspect.signature(command)
@@ -19,14 +21,14 @@ class Camera:
         new_args = (args, kwargs)
         self.objects.append((command, new_args, (original_x, original_y)))
 
-    def draw(self, x, y, scale=1):
+    def draw(self):
         self.current_id += 1
         self.execution_ids.append(self.current_id)
         self.turtle.reset()
         self.turtle.hideturtle()
         self.turtle.clear()
         self.turtle.penup()
-        self.turtle.goto((-x) * scale, (-y) * scale)
+        self.turtle.goto((-self.x) * self.scale, (-self.y) * self.scale)
         self.turtle.showturtle()
 
         for command, (args, kwargs), (original_x, original_y) in self.objects:
@@ -39,45 +41,35 @@ class Camera:
 
             if command.__name__ in ['forward', 'fd', 'back', 'backward', 'bk', 'circle']:
                 if len(new_args) > 0:
-                    new_args[0] *= scale
+                    new_args[0] *= self.scale
                 if 'distance' in new_kwargs:
-                    new_kwargs['distance'] *= scale
+                    new_kwargs['distance'] *= self.scale
                 if 'radius' in new_kwargs:
-                    new_kwargs['radius'] *= scale
+                    new_kwargs['radius'] *= self.scale
 
             if 'x' in params and original_x is not None:
                 if 'x' in new_kwargs:
-                    new_kwargs['x'] = (original_x - x) * scale
+                    new_kwargs['x'] = (original_x - self.x) * self.scale
                 else:
                     index = list(params.keys()).index('x')
                     if index < len(new_args):
-                        new_args[index] = (original_x - x) * scale
+                        new_args[index] = (original_x - self.x) * self.scale
 
             if 'y' in params and original_y is not None:
                 if 'y' in new_kwargs:
-                    new_kwargs['y'] = (original_y - y) * scale
+                    new_kwargs['y'] = (original_y - self.y) * self.scale
                 else:
                     index = list(params.keys()).index('y')
                     if index < len(new_args):
-                        new_args[index] = (original_y - y) * scale
+                        new_args[index] = (original_y - self.y) * self.scale
 
             command(*new_args, **new_kwargs)
 
         self.execution_ids.remove(self.current_id)
 
-# Set up the screen
-screen = turtle.Screen()
-screen.title("Testing")
-pen = turtle.Turtle()
-pen.speed(0)
-x, y = 0, 0
-scale = 3
-objects = []
-redraw = 0
-
 class MouseEventHandler:
-    def __init__(self, canvas, screen):
-        self.canvas = canvas
+    def __init__(self, camera, screen):
+        self.camera = camera
         self.screen = screen
         self.mouse_down_pos = None
 
@@ -85,28 +77,31 @@ class MouseEventHandler:
         self.mouse_down_pos = (x, y)
 
     def on_mouse_up(self, event):
-        global x, y
         mouse_up_pos = (event.x - self.screen.window_width() // 2, 
                         -(event.y - self.screen.window_height() // 2))
         if self.mouse_down_pos:
-            x_diff = (mouse_up_pos[0] - self.mouse_down_pos[0]) / scale
-            y_diff = (mouse_up_pos[1] - self.mouse_down_pos[1]) / scale
-            x -= x_diff
-            y -= y_diff
-            self.canvas.draw(x, y, scale)
+            x_diff = (mouse_up_pos[0] - self.mouse_down_pos[0]) / self.camera.scale
+            y_diff = (mouse_up_pos[1] - self.mouse_down_pos[1]) / self.camera.scale
+            self.camera.x -= x_diff
+            self.camera.y -= y_diff
+            self.camera.draw()
 
     def on_scroll(self, event):
-        global scale, redraw
-        
-        self.min_redraw = 10
-        redraw += abs(event.delta)
-        scale -= (event.delta / 5)
-        scale = max(0.1, scale)
-        if self.min_redraw < redraw:
-            redraw = 0
-            c.draw(x, y, scale)
+        self.camera.redraw += abs(event.delta)
+        self.camera.scale -= (event.delta / 5)
+        self.camera.scale = max(0.1, self.camera.scale)
+        if self.camera.redraw > 5:
+            self.camera.redraw = 0
+            self.camera.draw()
 
-c = Camera(x, y, objects, pen)
+# Set up the screen
+screen = turtle.Screen()
+screen.title("Testing")
+pen = turtle.Turtle()
+pen.speed(0)
+objects = []
+
+c = Camera(0, 0, objects, pen, scale=3)
 c.add(pen.speed, 0)
 c.add(pen.pendown)
 c.add(pen.goto, 20, 20)
@@ -114,9 +109,9 @@ c.add(pen.goto, 0, 40)
 c.add(pen.goto, -20, 20)
 c.add(pen.goto, 0, 0)
 c.add(pen.forward, 50)
-c.add(pen.back,50)
+c.add(pen.back, 50)
 c.add(pen.circle, 30)
-c.draw(x, y, scale)
+c.draw()
 
 # Set up the mouse event handler
 mouse_handler = MouseEventHandler(c, screen)
