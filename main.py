@@ -1,3 +1,4 @@
+import math
 import turtle
 import inspect
 from tkinter import *
@@ -30,7 +31,6 @@ class Camera:
         self.turtle.penup()
         self.turtle.goto((-self.x) * self.scale, (-self.y) * self.scale)
         self.turtle.showturtle()
-        self.turtle.pendown()
 
         for command, (args, kwargs), (original_x, original_y) in self.objects:
             if self.execution_ids and self.execution_ids[-1] != self.current_id:
@@ -95,50 +95,72 @@ class MouseEventHandler:
             self.camera.redraw = 0
             self.camera.draw()
 
-def draw_koch(camera, turtle, order, size):
-    if order == 0:
-        camera.add(turtle.forward, size)
-    else:
-        for angle in [60, -120, 60, 0]:
-            draw_koch(camera, turtle, order-1, size/3)
-            camera.add(turtle.left, angle)
+def calculate_components(angle, distance):
+    radians = math.radians(angle)
+    dx = distance * math.cos(radians)
+    dy = distance * math.sin(radians)
+    return dx, dy
 
-def draw_sierpinski(camera, turtle, order, size):
+def add_line(camera, x, y, angle, distance):
+    dx, dy = calculate_components(angle, distance)
+    camera.add(camera.turtle.pendown)
+    camera.add(camera.turtle.goto, x + dx, y + dy)
+    camera.add(camera.turtle.penup)
+
+def draw_koch(camera, turtle, order, size, x=0, y=0, angle=0):
+    if order == 0:
+        add_line(camera, x, y, angle, size)
+    else:
+        for angle_change in [60, -120, 60, 0]:
+            draw_koch(camera, turtle, order-1, size/3, x, y, angle)
+            dx, dy = calculate_components(angle, size/3)
+            x += dx
+            y += dy
+            angle += angle_change
+
+def draw_sierpinski(camera, turtle, order, size, x=0, y=0, angle=0):
     if order == 0:
         for _ in range(3):
-            camera.add(turtle.forward, size)
-            camera.add(turtle.left, 120)
+            add_line(camera, x, y, angle, size)
+            dx, dy = calculate_components(angle, size)
+            x += dx
+            y += dy
+            angle += 120
     else:
         for _ in range(3):
-            draw_sierpinski(camera, turtle, order-1, size/2)
-            camera.add(turtle.forward, size)
-            camera.add(turtle.left, 120)
+            draw_sierpinski(camera, turtle, order-1, size/2, x, y, angle)
+            dx, dy = calculate_components(angle, size)
+            x += dx
+            y += dy
+            angle += 120
 
-def draw_tree(camera, turtle, branch_length, shorten_by, angle):
+def draw_tree(camera, turtle, branch_length, shorten_by, angle, x=0, y=0, current_angle=0):
     if branch_length > 5:
-        camera.add(turtle.forward, branch_length)
-        camera.add(turtle.left, angle)
-        draw_tree(camera, turtle, branch_length - shorten_by, shorten_by, angle)
-        camera.add(turtle.right, angle * 2)
-        draw_tree(camera, turtle, branch_length - shorten_by, shorten_by, angle)
-        camera.add(turtle.left, angle)
-        camera.add(turtle.backward, branch_length)
+        add_line(camera, x, y, current_angle, branch_length)
+        dx, dy = calculate_components(current_angle, branch_length)
+        x += dx
+        y += dy
+        draw_tree(camera, turtle, branch_length - shorten_by, shorten_by, angle, x, y, current_angle + angle)
+        draw_tree(camera, turtle, branch_length - shorten_by, shorten_by, angle, x, y, current_angle - angle)
+        add_line(camera, x, y, current_angle + 180, branch_length)
 
-def draw_dragon(camera, turtle, order, size, sign=1):
+def draw_dragon(camera, turtle, order, size, x=0, y=0, angle=0, sign=1):
     if order == 0:
-        camera.add(turtle.forward, size)
+        add_line(camera, x, y, angle, size)
     else:
-        draw_dragon(camera, turtle, order - 1, size / 1.414, 1)
-        camera.add(turtle.left, 45 * sign)
-        draw_dragon(camera, turtle, order - 1, size / 1.414, -1)
-        camera.add(turtle.right, 45 * sign)
+        draw_dragon(camera, turtle, order - 1, size / 1.414, x, y, angle, 1)
+        dx, dy = calculate_components(angle, size / 1.414)
+        x += dx
+        y += dy
+        draw_dragon(camera, turtle, order - 1, size / 1.414, x, y, angle + 45 * sign, -1)
+        angle += -45 * sign
 
 def draw_fractal(fractal_function, *args):
     pen.reset()
     pen.penup()
     pen.goto(-200, 0)
     pen.pendown()
-    fractal_function(c, pen, *args)
+    fractal_function(c, pen, *args, x=-200, y=0, angle=0)
     c.draw()
 
 # Set up the screen
