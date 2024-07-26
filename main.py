@@ -30,6 +30,7 @@ class Camera:
         self.turtle.penup()
         self.turtle.goto((-self.x) * self.scale, (-self.y) * self.scale)
         self.turtle.showturtle()
+        self.turtle.pendown()
 
         for command, (args, kwargs), (original_x, original_y) in self.objects:
             if self.execution_ids and self.execution_ids[-1] != self.current_id:
@@ -94,24 +95,60 @@ class MouseEventHandler:
             self.camera.redraw = 0
             self.camera.draw()
 
+def draw_koch(camera, turtle, order, size):
+    if order == 0:
+        camera.add(turtle.forward, size)
+    else:
+        for angle in [60, -120, 60, 0]:
+            draw_koch(camera, turtle, order-1, size/3)
+            camera.add(turtle.left, angle)
+
+def draw_sierpinski(camera, turtle, order, size):
+    if order == 0:
+        for _ in range(3):
+            camera.add(turtle.forward, size)
+            camera.add(turtle.left, 120)
+    else:
+        for _ in range(3):
+            draw_sierpinski(camera, turtle, order-1, size/2)
+            camera.add(turtle.forward, size)
+            camera.add(turtle.left, 120)
+
+def draw_tree(camera, turtle, branch_length, shorten_by, angle):
+    if branch_length > 5:
+        camera.add(turtle.forward, branch_length)
+        camera.add(turtle.left, angle)
+        draw_tree(camera, turtle, branch_length - shorten_by, shorten_by, angle)
+        camera.add(turtle.right, angle * 2)
+        draw_tree(camera, turtle, branch_length - shorten_by, shorten_by, angle)
+        camera.add(turtle.left, angle)
+        camera.add(turtle.backward, branch_length)
+
+def draw_dragon(camera, turtle, order, size, sign=1):
+    if order == 0:
+        camera.add(turtle.forward, size)
+    else:
+        draw_dragon(camera, turtle, order - 1, size / 1.414, 1)
+        camera.add(turtle.left, 45 * sign)
+        draw_dragon(camera, turtle, order - 1, size / 1.414, -1)
+        camera.add(turtle.right, 45 * sign)
+
+def draw_fractal(fractal_function, *args):
+    pen.reset()
+    pen.penup()
+    pen.goto(-200, 0)
+    pen.pendown()
+    fractal_function(c, pen, *args)
+    c.draw()
+
 # Set up the screen
 screen = turtle.Screen()
-screen.title("Testing")
+screen.title("Fractal Drawer")
 pen = turtle.Turtle()
 pen.speed(0)
 objects = []
 
 c = Camera(0, 0, objects, pen, scale=3)
-c.add(pen.speed, 0)
-c.add(pen.pendown)
-c.add(pen.goto, 20, 20)
-c.add(pen.goto, 0, 40)
-c.add(pen.goto, -20, 20)
-c.add(pen.goto, 0, 0)
-c.add(pen.forward, 50)
-c.add(pen.back, 50)
-c.add(pen.circle, 30)
-c.draw()
 
 # Set up the mouse event handler
 mouse_handler = MouseEventHandler(c, screen)
@@ -119,6 +156,13 @@ screen.onscreenclick(mouse_handler.on_mouse_down, 1)
 canvas = screen.getcanvas()
 canvas.bind("<ButtonRelease-1>", mouse_handler.on_mouse_up)
 canvas.bind_all("<MouseWheel>", mouse_handler.on_scroll)
+
+# Bind keys to draw different fractals
+screen.onkey(lambda: draw_fractal(draw_koch, 4, 400), "1")
+screen.onkey(lambda: draw_fractal(draw_sierpinski, 4, 400), "2")
+screen.onkey(lambda: draw_fractal(draw_tree, 100, 15, 30), "3")
+screen.onkey(lambda: draw_fractal(draw_dragon, 10, 200), "4")
+screen.listen()
 
 # Keep the window open and responsive
 screen.mainloop()
