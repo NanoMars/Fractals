@@ -22,6 +22,11 @@ class Camera:
         new_args = (args, kwargs)
         self.objects.append((command, new_args, (original_x, original_y)))
 
+    def is_within_screen(self, x, y):
+        screen_width, screen_height = self.turtle.screen.window_width(), self.turtle.screen.window_height()
+        half_width, half_height = screen_width // 2, screen_height // 2
+        return (-half_width <= x <= half_width) and (-half_height <= y <= half_height)
+
     def draw(self):
         self.current_id += 1
         self.execution_ids.append(self.current_id)
@@ -64,7 +69,12 @@ class Camera:
                     if index < len(new_args):
                         new_args[index] = (original_y - self.y) * self.scale
 
-            command(*new_args, **new_kwargs)
+            # Retrieve x and y coordinates safely
+            x = new_kwargs.get('x', new_args[0] if len(new_args) > 0 else None)
+            y = new_kwargs.get('y', new_args[1] if len(new_args) > 1 else None)
+
+            if x is not None and y is not None and self.is_within_screen(x, y):
+                command(*new_args, **new_kwargs)
 
         self.execution_ids.remove(self.current_id)
 
@@ -76,13 +86,16 @@ class MouseEventHandler:
 
     def on_mouse_down(self, x, y):
         self.mouse_down_pos = (x, y)
+        print(f"Mouse down at: {self.mouse_down_pos}")
 
     def on_mouse_up(self, event):
         mouse_up_pos = (event.x - self.screen.window_width() // 2, 
                         -(event.y - self.screen.window_height() // 2))
+        print(f"Mouse up at: {mouse_up_pos}")
         if self.mouse_down_pos:
             x_diff = (mouse_up_pos[0] - self.mouse_down_pos[0]) / self.camera.scale
             y_diff = (mouse_up_pos[1] - self.mouse_down_pos[1]) / self.camera.scale
+            print(f"Mouse diff: {x_diff}, {y_diff}")
             self.camera.x -= x_diff
             self.camera.y -= y_diff
             self.camera.draw()
@@ -103,6 +116,8 @@ def calculate_components(angle, distance):
 
 def add_line(camera, x, y, angle, distance):
     dx, dy = calculate_components(angle, distance)
+    camera.add(camera.turtle.penup)
+    camera.add(camera.turtle.goto, x, y)
     camera.add(camera.turtle.pendown)
     camera.add(camera.turtle.goto, x + dx, y + dy)
     camera.add(camera.turtle.penup)
@@ -155,12 +170,18 @@ def draw_dragon(camera, turtle, order, size, x=0, y=0, angle=0, sign=1):
         draw_dragon(camera, turtle, order - 1, size / 1.414, x, y, angle + 45 * sign, -1)
         angle += -45 * sign
 
-def draw_fractal(fractal_function, *args):
+def draw_fractal(fractal_function, *args, **kwargs):
     pen.reset()
     pen.penup()
     pen.goto(-200, 0)
     pen.pendown()
-    fractal_function(c, pen, *args, x=-200, y=0, angle=0)
+    fractal_function(c, pen, *args, **kwargs)
+    c.draw()
+    pen.reset()
+    pen.penup()
+    pen.goto(-200, 0)
+    pen.pendown()
+    fractal_function(c, pen, *args, **kwargs)
     c.draw()
 
 # Set up the screen
