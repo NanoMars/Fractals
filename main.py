@@ -30,7 +30,6 @@ class Camera:
     def draw(self):
         self.current_id += 1
         self.execution_ids.append(self.current_id)
-        self.turtle.reset()
         self.turtle.hideturtle()
         self.turtle.clear()
         self.turtle.penup()
@@ -69,12 +68,19 @@ class Camera:
                     if index < len(new_args):
                         new_args[index] = (original_y - self.y) * self.scale
 
-            # Retrieve x and y coordinates safely
             x = new_kwargs.get('x', new_args[0] if len(new_args) > 0 else None)
             y = new_kwargs.get('y', new_args[1] if len(new_args) > 1 else None)
 
-            if x is not None and y is not None and self.is_within_screen(x, y):
-                command(*new_args, **new_kwargs)
+            if command.__name__ == 'penup':
+                print(f"Executing penup")
+                self.turtle.penup()
+            elif command.__name__ == 'pendown':
+                print(f"Executing pendown")
+                self.turtle.pendown()
+            else:
+                if x is not None and y is not None and self.is_within_screen(x, y):
+                    print(f"Executing {command.__name__} with args {new_args} and kwargs {new_kwargs}")
+                    command(*new_args, **new_kwargs)
 
         self.execution_ids.remove(self.current_id)
 
@@ -117,10 +123,15 @@ def calculate_components(angle, distance):
 def add_line(camera, x, y, angle, distance):
     dx, dy = calculate_components(angle, distance)
     camera.add(camera.turtle.penup)
+    print("Added penup")
     camera.add(camera.turtle.goto, x, y)
+    print(f"Added goto ({x}, {y})")
     camera.add(camera.turtle.pendown)
+    print("Added pendown")
     camera.add(camera.turtle.goto, x + dx, y + dy)
+    print(f"Added goto ({x + dx}, {y + dy})")
     camera.add(camera.turtle.penup)
+    print("Added penup")
 
 def draw_koch(camera, turtle, order, size, x=0, y=0, angle=0):
     if order == 0:
@@ -206,6 +217,8 @@ screen.onkey(lambda: draw_fractal(draw_sierpinski, 4, 400), "2")
 screen.onkey(lambda: draw_fractal(draw_tree, 100, 15, 30), "3")
 screen.onkey(lambda: draw_fractal(draw_dragon, 10, 200), "4")
 screen.listen()
+
+
 
 # Keep the window open and responsive
 screen.mainloop()
