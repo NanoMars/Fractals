@@ -83,6 +83,11 @@ class Camera:
                     command(*new_args, **new_kwargs)
 
         self.execution_ids.remove(self.current_id)
+    def get_fractal_order(self, base_order, min_order=0, max_order=10):
+        # Adjust the range and factor to suit your needs
+        scale_factor = 5
+        adjusted_order = base_order + int(self.scale * scale_factor)
+        return max(min_order, min(max_order, adjusted_order))
 
 class MouseEventHandler:
     def __init__(self, camera, screen):
@@ -133,18 +138,20 @@ def add_line(camera, x, y, angle, distance):
     camera.add(camera.turtle.penup)
     print("Added penup")
 
-def draw_koch(camera, turtle, order, size, x=0, y=0, angle=0):
+def draw_koch(camera, turtle, base_order, size, x=0, y=0, angle=0):
+    order = camera.get_fractal_order(base_order)
     if order == 0:
         add_line(camera, x, y, angle, size)
     else:
         for angle_change in [60, -120, 60, 0]:
-            draw_koch(camera, turtle, order-1, size/3, x, y, angle)
-            dx, dy = calculate_components(angle, size/3)
+            draw_koch(camera, turtle, order - 1, size / 3, x, y, angle)
+            dx, dy = calculate_components(angle, size / 3)
             x += dx
             y += dy
             angle += angle_change
 
-def draw_sierpinski(camera, turtle, order, size, x=0, y=0, angle=0):
+def draw_sierpinski(camera, turtle, base_order, size, x=0, y=0, angle=0):
+    order = camera.get_fractal_order(base_order)
     if order == 0:
         for _ in range(3):
             add_line(camera, x, y, angle, size)
@@ -154,11 +161,33 @@ def draw_sierpinski(camera, turtle, order, size, x=0, y=0, angle=0):
             angle += 120
     else:
         for _ in range(3):
-            draw_sierpinski(camera, turtle, order-1, size/2, x, y, angle)
+            draw_sierpinski(camera, turtle, order - 1, size / 2, x, y, angle)
             dx, dy = calculate_components(angle, size)
             x += dx
             y += dy
             angle += 120
+
+def draw_tree(camera, turtle, branch_length, shorten_by, angle, x=0, y=0, current_angle=0):
+    if branch_length > 5:
+        add_line(camera, x, y, current_angle, branch_length)
+        dx, dy = calculate_components(current_angle, branch_length)
+        x += dx
+        y += dy
+        draw_tree(camera, turtle, branch_length - shorten_by, shorten_by, angle, x, y, current_angle + angle)
+        draw_tree(camera, turtle, branch_length - shorten_by, shorten_by, angle, x, y, current_angle - angle)
+        add_line(camera, x, y, current_angle + 180, branch_length)
+
+def draw_dragon(camera, turtle, base_order, size, x=0, y=0, angle=0, sign=1):
+    order = camera.get_fractal_order(base_order)
+    if order == 0:
+        add_line(camera, x, y, angle, size)
+    else:
+        draw_dragon(camera, turtle, order - 1, size / 1.414, x, y, angle, 1)
+        dx, dy = calculate_components(angle, size / 1.414)
+        x += dx
+        y += dy
+        draw_dragon(camera, turtle, order - 1, size / 1.414, x, y, angle + 45 * sign, -1)
+        angle += -45 * sign
 
 def draw_tree(camera, turtle, branch_length, shorten_by, angle, x=0, y=0, current_angle=0):
     if branch_length > 5:
@@ -212,10 +241,10 @@ canvas.bind("<ButtonRelease-1>", mouse_handler.on_mouse_up)
 canvas.bind_all("<MouseWheel>", mouse_handler.on_scroll)
 
 # Bind keys to draw different fractals
-screen.onkey(lambda: draw_fractal(draw_koch, 4, 400), "1")
-screen.onkey(lambda: draw_fractal(draw_sierpinski, 4, 400), "2")
+screen.onkey(lambda: draw_fractal(draw_koch, 3, 400), "1")
+screen.onkey(lambda: draw_fractal(draw_sierpinski, 3, 400), "2")
 screen.onkey(lambda: draw_fractal(draw_tree, 100, 15, 30), "3")
-screen.onkey(lambda: draw_fractal(draw_dragon, 10, 200), "4")
+screen.onkey(lambda: draw_fractal(draw_dragon, 3, 200), "4")
 screen.listen()
 
 
