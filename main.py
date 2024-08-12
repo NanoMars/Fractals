@@ -1,7 +1,7 @@
+import math
 import turtle
 import inspect
 from tkinter import *
-import math
 
 class Camera:
     def __init__(self, x, y, objects, turtle, scale=1):
@@ -15,40 +15,12 @@ class Camera:
         self.redraw = 0
 
     def add(self, command, *args, **kwargs):
-        original_x = self.turtle.xcor()
-        original_y = self.turtle.ycor()
         sig = inspect.signature(command)
         params = sig.parameters
-
-        # Convert movement commands to goto commands
-        if command.__name__ in ['forward', 'fd', 'back', 'backward', 'bk']:
-            distance = args[0] * self.scale if len(args) > 0 else kwargs['distance'] * self.scale
-            angle = self.turtle.heading()
-            if command.__name__ in ['back', 'backward', 'bk']:
-                angle += 180  # Reverse direction for backward movement
-            radian_angle = math.radians(angle)
-            dx = distance * math.cos(radian_angle)
-            dy = distance * math.sin(radian_angle)
-            new_x = self.turtle.xcor() + dx
-            new_y = self.turtle.ycor() + dy
-            command = self.turtle.goto
-            args = (new_x, new_y)
-            kwargs = {}
-
-        # Convert rotation commands to setheading
-        elif command.__name__ in ['left', 'lt']:
-            new_heading = self.turtle.heading() + args[0]
-            args = (new_heading,)
-            kwargs = {}
-            command = self.turtle.setheading
-
-        elif command.__name__ in ['right', 'rt']:
-            new_heading = self.turtle.heading() - args[0]
-            args = (new_heading,)
-            kwargs = {}
-            command = self.turtle.setheading
-
-        self.objects.append((command, (args, kwargs), (original_x, original_y)))
+        original_x = kwargs.get('x', args[0] if len(args) > 0 else None)
+        original_y = kwargs.get('y', args[1] if len(args) > 1 else None)
+        new_args = (args, kwargs)
+        self.objects.append((command, new_args, (original_x, original_y)))
 
     def draw(self):
         self.current_id += 1
@@ -59,31 +31,42 @@ class Camera:
         self.turtle.penup()
         self.turtle.goto((-self.x) * self.scale, (-self.y) * self.scale)
         self.turtle.showturtle()
-        self.turtle.pendown()
 
         for command, (args, kwargs), (original_x, original_y) in self.objects:
             if self.execution_ids and self.execution_ids[-1] != self.current_id:
                 continue
             new_args = list(args)
             new_kwargs = dict(kwargs)
+            sig = inspect.signature(command)
+            params = sig.parameters
 
-            if 'x' in new_kwargs and original_x is not None:
-                new_kwargs['x'] = (original_x - self.x) * self.scale
+            if command.__name__ in ['forward', 'fd', 'back', 'backward', 'bk', 'circle']:
+                if len(new_args) > 0:
+                    new_args[0] *= self.scale
+                if 'distance' in new_kwargs:
+                    new_kwargs['distance'] *= self.scale
+                if 'radius' in new_kwargs:
+                    new_kwargs['radius'] *= self.scale
 
-            if 'y' in new_kwargs and original_y is not None:
-                new_kwargs['y'] = (original_y - self.y) * self.scale
+            if 'x' in params and original_x is not None:
+                if 'x' in new_kwargs:
+                    new_kwargs['x'] = (original_x - self.x) * self.scale
+                else:
+                    index = list(params.keys()).index('x')
+                    if index < len(new_args):
+                        new_args[index] = (original_x - self.x) * self.scale
+
+            if 'y' in params and original_y is not None:
+                if 'y' in new_kwargs:
+                    new_kwargs['y'] = (original_y - self.y) * self.scale
+                else:
+                    index = list(params.keys()).index('y')
+                    if index < len(new_args):
+                        new_args[index] = (original_y - self.y) * self.scale
 
             command(*new_args, **new_kwargs)
 
         self.execution_ids.remove(self.current_id)
-
-    def draw_line(self, angle, distance):
-        radian_angle = math.radians(angle)
-        dx = distance * math.cos(radian_angle) * self.scale
-        dy = distance * math.sin(radian_angle) * self.scale
-        new_x = self.turtle.xcor() + dx
-        new_y = self.turtle.ycor() + dy
-        self.add(self.turtle.goto, new_x, new_y)
 
 class MouseEventHandler:
     def __init__(self, camera, screen):
@@ -112,50 +95,72 @@ class MouseEventHandler:
             self.camera.redraw = 0
             self.camera.draw()
 
-def draw_koch(camera, turtle, order, size):
-    if order == 0:
-        camera.draw_line(turtle.heading(), size)
-    else:
-        for angle in [60, -120, 60, 0]:
-            draw_koch(camera, turtle, order-1, size/3)
-            turtle.setheading(turtle.heading() + angle)
+def calculate_components(angle, distance):
+    radians = math.radians(angle)
+    dx = distance * math.cos(radians)
+    dy = distance * math.sin(radians)
+    return dx, dy
 
-def draw_sierpinski(camera, turtle, order, size):
+def add_line(camera, x, y, angle, distance):
+    dx, dy = calculate_components(angle, distance)
+    camera.add(camera.turtle.pendown)
+    camera.add(camera.turtle.goto, x + dx, y + dy)
+    camera.add(camera.turtle.penup)
+
+def draw_koch(camera, turtle, order, size, x=0, y=0, angle=0):
+    if order == 0:
+        add_line(camera, x, y, angle, size)
+    else:
+        for angle_change in [60, -120, 60, 0]:
+            draw_koch(camera, turtle, order-1, size/3, x, y, angle)
+            dx, dy = calculate_components(angle, size/3)
+            x += dx
+            y += dy
+            angle += angle_change
+
+def draw_sierpinski(camera, turtle, order, size, x=0, y=0, angle=0):
     if order == 0:
         for _ in range(3):
-            camera.draw_line(turtle.heading(), size)
-            turtle.setheading(turtle.heading() + 120)
+            add_line(camera, x, y, angle, size)
+            dx, dy = calculate_components(angle, size)
+            x += dx
+            y += dy
+            angle += 120
     else:
         for _ in range(3):
-            draw_sierpinski(camera, turtle, order-1, size/2)
-            camera.draw_line(turtle.heading(), size)
-            turtle.setheading(turtle.heading() + 120)
+            draw_sierpinski(camera, turtle, order-1, size/2, x, y, angle)
+            dx, dy = calculate_components(angle, size)
+            x += dx
+            y += dy
+            angle += 120
 
-def draw_tree(camera, turtle, branch_length, shorten_by, angle):
+def draw_tree(camera, turtle, branch_length, shorten_by, angle, x=0, y=0, current_angle=0):
     if branch_length > 5:
-        camera.draw_line(turtle.heading(), branch_length)
-        turtle.setheading(turtle.heading() + angle)
-        draw_tree(camera, turtle, branch_length - shorten_by, shorten_by, angle)
-        turtle.setheading(turtle.heading() - 2 * angle)
-        draw_tree(camera, turtle, branch_length - shorten_by, shorten_by, angle)
-        turtle.setheading(turtle.heading() + angle)
-        camera.draw_line(turtle.heading() + 180, branch_length)
+        add_line(camera, x, y, current_angle, branch_length)
+        dx, dy = calculate_components(current_angle, branch_length)
+        x += dx
+        y += dy
+        draw_tree(camera, turtle, branch_length - shorten_by, shorten_by, angle, x, y, current_angle + angle)
+        draw_tree(camera, turtle, branch_length - shorten_by, shorten_by, angle, x, y, current_angle - angle)
+        add_line(camera, x, y, current_angle + 180, branch_length)
 
-def draw_dragon(camera, turtle, order, size, sign=1):
+def draw_dragon(camera, turtle, order, size, x=0, y=0, angle=0, sign=1):
     if order == 0:
-        camera.draw_line(turtle.heading(), size)
+        add_line(camera, x, y, angle, size)
     else:
-        draw_dragon(camera, turtle, order - 1, size / 1.414, 1)
-        turtle.setheading(turtle.heading() + 45 * sign)
-        draw_dragon(camera, turtle, order - 1, size / 1.414, -1)
-        turtle.setheading(turtle.heading() - 45 * sign)
+        draw_dragon(camera, turtle, order - 1, size / 1.414, x, y, angle, 1)
+        dx, dy = calculate_components(angle, size / 1.414)
+        x += dx
+        y += dy
+        draw_dragon(camera, turtle, order - 1, size / 1.414, x, y, angle + 45 * sign, -1)
+        angle += -45 * sign
 
 def draw_fractal(fractal_function, *args):
     pen.reset()
     pen.penup()
     pen.goto(-200, 0)
     pen.pendown()
-    fractal_function(c, pen, *args)
+    fractal_function(c, pen, *args, x=-200, y=0, angle=0)
     c.draw()
 
 # Set up the screen
