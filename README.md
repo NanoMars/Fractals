@@ -4,7 +4,8 @@ This project used ai to aid in the creation of the code, & with some math things
 
 Draws fractals in python using the turtle module on a page that can be scaled and moved. The highlight of this is the camera class which allows for movement and scaling of the viewport to inspect the fractals. This was made for Hack Club Arcade
 
-This project uses the MIT license.
+![img](https://cloud-335f8gztc-hack-club-bot.vercel.app/0image.png)
+
 
 ## installation
 1. Install python
@@ -45,3 +46,5 @@ This project uses the MIT license.
     - Keys 1-4 do stuff, I've forgotten at this point what they do but thats the fun.
     - Scroll wheel to zoom in and out
     - Click and drag to move the canvas
+
+This project uses the MIT license.
